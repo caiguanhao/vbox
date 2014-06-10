@@ -1,0 +1,67 @@
+   Tools to install and run a lot of Windows software in a short time on many
+   Linux VirtualBox instances which should be billed hourly and cheap to use.
+
+
+========================= Install VirtualBox on Ubuntu =========================
+
+apt-get update
+apt-get install virtualbox -y
+VBOXVERSION="$(vboxmanage --version | grep -Eo '[0-9.]+' | head -1)"
+DL="http://download.virtualbox.org/virtualbox/${VBOXVERSION}"
+curl -L#O ${DL}/Oracle_VM_VirtualBox_Extension_Pack-${VBOXVERSION}.vbox-extpack
+curl -L#O ${DL}/VBoxGuestAdditions_${VBOXVERSION}.iso
+vboxmanage extpack install \
+  Oracle_VM_VirtualBox_Extension_Pack-${VBOXVERSION}.vbox-extpack
+
+
+====================== Make a new Windows virtual machine ======================
+        - See: http://www.virtualbox.org/manual/ch07.html#idp56560400 -
+
+VMNAME="WINXP"
+STORAGECTL="IDE Controller"
+VDIFILE="WinXP.vdi"
+vboxmanage createvm --name "${VMNAME}" --ostype WindowsXP --register
+vboxmanage modifyvm "${VMNAME}" --memory 512 --acpi on --boot1 dvd --nic1 nat
+vboxmanage createhd --filename "${VDIFILE}" --size 10000
+vboxmanage storagectl "${VMNAME}" --name "${STORAGECTL}" \
+  --add ide --controller PIIX4
+vboxmanage storageattach "${VMNAME}" --storagectl "${STORAGECTL}" \
+  --port 0 --device 0 --type hdd --medium "${VDIFILE}"
+vboxmanage storageattach "${VMNAME}" --storagectl "${STORAGECTL}" \
+  --port 0 --device 1 --type dvddrive --medium ./WindowsXPSP3.iso
+vboxheadless --startvm "${VMNAME}"
+
+        - Log in via RDP or VNC, install Windows and your software. -
+          - You may need to install VirtualBox Guest Additions: -
+
+vboxmanage storageattach "${VMNAME}" --storagectl "${STORAGECTL}" \
+  --port 0 --device 1 --type dvddrive \
+  --medium ./VBoxGuestAdditions_${VBOXVERSION}.iso
+
+          - Run Disk Defragmenter and sdelete –z on Windows. -
+          - And following command on Ubuntu to compress VDI. -
+                - See http://superuser.com/a/529183 -
+
+vboxmanage modifyhd ${VDIFILE} --compact
+
+
+=========================== Clone a virtual machine ============================
+
+vboxmanage clonehd "WinXP.vdi" "WinXPClone.vdi"
+apt-get install p7zip-full
+7z a WinXPClone.vdi.7z WinXPClone.vdi
+
+        - scp the .7z file to other server and also install VirtualBox -
+
+7z x WinXPClone.vdi.7z
+mv WinXPClone.vdi WinXP.vdi
+VMNAME="WINXP"
+STORAGECTL="IDE Controller"
+VDIFILE="WinXP.vdi"
+vboxmanage createvm --name "${VMNAME}" --ostype WindowsXP --register
+vboxmanage modifyvm "${VMNAME}" --memory 512 --acpi on --boot1 disk --nic1 nat
+vboxmanage storagectl "${VMNAME}" --name "${STORAGECTL}" \
+  --add ide --controller PIIX4
+vboxmanage storageattach "${VMNAME}" --storagectl "${STORAGECTL}" \
+  --port 0 --device 0 --type hdd --medium "${VDIFILE}"
+vboxheadless --startvm "${VMNAME}"
